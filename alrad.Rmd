@@ -11,9 +11,7 @@ library(prospectr)
 ###################################################
 ### Auxiliar functions
 ###################################################
-## teste de modificacao
-
-
+## teste 
 
 fOK          <- function(h,...){do.call(h$action,list(svalue(h$obj)))}
 stub         <- function(h,...) gmessage("Called Handler", parent = window)
