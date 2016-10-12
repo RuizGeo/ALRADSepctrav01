@@ -1,0 +1,317 @@
+
+```{r Packages}
+install.packages(c("gWidgetsRGtk2", dep = TRUE))
+library(gWidgetsRGtk2)
+library(hyperSpec)
+library(graphics)
+library(prospectr)
+```
+
+``` {r ALRAD Spectra v.0.1}
+###################################################
+### Auxiliar functions
+###################################################
+fOK          <- function(h,...){do.call(h$action,list(svalue(h$obj)))}
+stub         <- function(h,...) gmessage("Called Handler", parent = window)
+fquit        <- function(...)   gconfirm("Are you sure?", icon="warning", parent=window, handler=dispose(window))
+fconfirmquit <- function(h,...) {
+                  val <- gconfirm("Are you sure?", parent=h$obj)
+                  if(as.logical(val))
+                    return(FALSE) #close
+                  else
+                    return(TRUE)  #don't close
+                  }
+fbrowse      <- function(...) svalue(file.browse) <- file.choose()
+fimport      <- function(...) {alldata <<- read.table(file = svalue(file.browse),
+                                                      header = as.logical(svalue(file.header)),
+                                                      sep = svalue(file.sep))
+                               spectra.start.column <<- as.numeric(svalue(spc.start.col))
+                               spectra.end.column   <<- as.numeric(svalue(spc.end.col))
+                               spectra.start.number <<- as.numeric(svalue(spc.first))
+                               spectra.end.number   <<- as.numeric(svalue(spc.last))
+                               soil.var.column      <<- as.numeric(svalue(soil.var.col))
+                               fonlyspectra()
+                               gmessage("Import successful!", title = "File import",
+                                        icon = "info",  parent = window)}
+fonlyspectra <- function(...) {spc <- alldata[,spectra.start.column:spectra.end.column]
+                               colnames(spc) <- c(spectra.start.number:spectra.end.number)
+                               spectra <<- spc}
+fview        <- function(...) gtable(alldata, cont = gwindow("View data", width = 800, height = 200))
+fplot        <- function(...) {plotwin <- gwindow("Plot", width = 800, height = 600)
+                                 ggraphics(cont = plotwin)
+                                 matplot(colnames(spectra), t(spectra), 
+                                    type = "l", 
+                                    xlab = "Wavelength (nm)", 
+                                    ylab = "Reflectance")}
+### Preprocessing functions
+fnrm         <- function(...) spectra <<- movav(spectra, w = as.numeric(svalue(number.smooth)))
+fdet         <- function(...) spectra <<- detrend(X = spectra, wav = as.numeric(colnames(spectra)))
+fcrm         <- function(...) spectra <<- continuumRemoval(X=spectra, type = "R", interpol="linear",
+                                                            method="division")
+fsgd         <- function(...) spectra <<- savitzkyGolay(spectra, 
+                                                        p = as.numeric(svalue(sgd.poly)),
+                                                        w = as.numeric(svalue(sgd.smooth)),
+                                                        m = as.numeric(svalue(sgd.deriv)))
+fsnv         <- function(...) spectra <<- standardNormalVariate(X = spectra)
+fmsc         <- function(...) spectra <<- msc(spectra)
+fnor         <- function(...) spectra <<- data.Normalization(spectra, type="n5", normalization="row")
+###################################################
+### Vectors
+###################################################
+sgpolynomial         <- c(1:12)
+sgderivarive         <- c(1:4)
+normalization.types  <- c("n1: standardization ((x-mean)/sd)",
+                          "n5: normalization in range <-1,1> ((x-mean)/max(abs(x-mean)))",
+                          "n6: quotient transformation (x/mean)",
+                          "n12: normalization ((x-mean)/sqrt(sum((x-mean)^2)))",
+                          "n13: normalization with zero being the central point ((x-midrange)/(range/2))")
+train.ctrl.method    <- c("boot", "cv", "LOOCV", "LGOCV", "repeatedcv", "timeslice", "none")
+train.ctrl.method.rf <- c("boot", "cv", "LOOCV", "LGOCV", "repeatedcv", "timeslice", "oob", "none")
+svm.types            <- c('svmLinear2','svmPoly','svmRadial')
+kernel.param         <- c("Support Vector Machines with Linear Kernel",
+                         "Support Vector Machines with Polynomial Kernel",
+                         "Support Vector Machines with Radial Basis Function Kernel")
+actf                 <- c("radial basis","sigmoid","sine","hard-limit","symmetric hard-limit",
+                          "satlins","tan-sigmoid","triangular basis", "positive linear", "linear")
+bayesian.family      <- c("gaussian", "binomial", "Gamma", "inverse.gaussian", "poisson", "quasi", "quasibinomial", "quasipoisson")
+
+###################################################
+### Main window
+###################################################
+window        <- gwindow("ALRAD Spectra v.0.1", visible=F, width = 600,height = 200)
+addHandlerUnrealize(window, handler = fconfirmquit) #confirm closing
+### Start Menu
+action.list   <- list(
+  new =  gaction(label = "New",  icon = "new",  handler = stub, parent = window),
+  open = gaction(label = "Open", icon = "open", handler = stub, parent = window),
+  save = gaction(label = "Save", icon = "save", handler = stub, parent = window),
+  quit = gaction(label = "Quit", icon = "quit",  handler = fquit))
+toolbar.list  <- c(action.list[c("new","open","save")], sep = gseparator(), action.list["quit"])
+toolbar       <- gtoolbar(toolbar.list, cont = window)
+
+###################################################
+### Import data
+###################################################
+notebook       <- gnotebook(cont = window)
+import         <- ggroup(cont = notebook, horizontal = F,label = gettext("      IMPORT DATA      "))
+### Browse file
+frame.imp      <- gframe("File path:", cont = import, horizontal=T)
+file.browse    <- gedit(text = "", cont = frame.imp,width = 50) 
+                  gbutton("Browse", cont = frame.imp, handler = fbrowse)
+### Parameters
+frame.file.arg <- gframe("Parameters:", cont = import, horizontal=TRUE)
+                 lyt.file.arg                      <- glayout(cont = frame.file.arg, expand = F)
+                 lyt.file.arg[1,1,anchor=c(-1,-1)] <- "Header"
+file.header   <- lyt.file.arg[2,1,anchor=c(0,0)]   <- gradio(c("TRUE", "FALSE"), cont = lyt.file.arg)
+                 lyt.file.arg[1,2,anchor=c(-1,-1)] <- "Separator"
+file.sep      <- lyt.file.arg[2,2,anchor=c(1,1)]   <- gedit(text = ",", cont = lyt.file.arg, width = 1)
+                 lyt.file.arg[1,3,anchor=c(1,0)]   <- "Spectral data \nstarts at column:"
+spc.start.col <- lyt.file.arg[2,3,anchor=c(0,0)]   <- gedit(text = "", cont = lyt.file.arg, width = 2)
+                 lyt.file.arg[1,4,anchor=c(1,0)]   <- "Spectral data \nfinishes at column:"
+spc.end.col   <- lyt.file.arg[2,4,anchor=c(0,0)]   <- gedit(text = "", cont = lyt.file.arg, width = 4)
+                 lyt.file.arg[1,5,anchor=c(1,0)]   <- "Starting number \nof spectrum:"
+spc.first     <- lyt.file.arg[2,5,anchor=c(0,0)]   <- gedit(text = "350", cont = lyt.file.arg, width = 4)
+                 lyt.file.arg[1,6,anchor=c(1,0)]   <- "Finishing number \nof spectrum:"
+spc.last      <- lyt.file.arg[2,6,anchor=c(0,0)]   <- gedit(text = "2500", cont = lyt.file.arg, width = 4)
+                 lyt.file.arg[1,7,anchor=c(1,0)]   <- "Soil variable \nis at column:"
+soil.var.col  <- lyt.file.arg[2,7,anchor=c(0,0)]   <- gedit(text = "", cont = lyt.file.arg, width = 4)
+### Import
+gbutton("Import file", cont = import, handler = fimport)
+### View data
+gbutton("View data", cont = import, handler = fview)
+### Plot raw data
+gbutton("Plot raw spectra", cont = import, handler = fplot)
+
+###################################################
+### Preprocessing
+###################################################
+pp  <- gnotebook(cont = notebook, label = gettext(" SPECTRAL PREPROCESSING"),horizontal = F, width = 30)
+nrm <- ggroup(cont = pp, horizontal = F,label = gettext("Noise Removal"))
+det <- ggroup(cont = pp, horizontal = F,label = gettext("  Detrend  "))
+crm <- ggroup(cont = pp, horizontal = F,label = gettext("Continuum Removal"))
+sgd <- ggroup(cont = pp, horizontal = F,label = gettext("Savitzky-Golay Derivative"))
+snv <- ggroup(cont = pp, horizontal = F,label = gettext("   SNV   "))
+msc <- ggroup(cont = pp, horizontal = F,label = gettext("   MSC   "))
+nor <- ggroup(cont = pp, horizontal = F,label = gettext(" Normalization "))
+### Noise Removal
+frame.desc.nrm     <- gframe("Description:", cont = nrm, horizontal = T)
+lyt.desc.nrm       <- glayout(cont = frame.desc.nrm , expand = TRUE)
+lyt.desc.nrm[1,1]  <- "A simple moving average of spectral data using a convolution function. Package: prospectr"
+frame.param.nrm    <- gframe("Parameters:", cont = nrm, horizontal=T)
+lyt.param.nrm      <- glayout(cont = frame.param.nrm, expand = TRUE)
+lyt.param.nrm[1,1] <- "Number of smoothing points"
+number.smooth      <- lyt.param.nrm[2,1] <- gspinbutton(from = 5, to = 101, by = 2, cont = lyt.param.nrm)
+                      gbutton("Run", cont = nrm, handler = fnrm)
+                      gbutton("Plot spectra", cont = nrm, handler = fplot)
+### Detrend
+frame.desc.det     <- gframe("Description:", cont = det, horizontal=T)
+lyt.desc.det       <- glayout(cont = frame.desc.det, expand = TRUE)
+lyt.desc.det[1,1]  <- "Normalizes each row by applying a Standard Normal Variate transformation followed by fitting \na second order linear model and returning the fitted residuals. Package: prospectr"
+                      gbutton("Run", cont = det, handler = fdet)
+                      gbutton("Plot spectra", cont = det, handler = fplot)
+### Continuum Removal
+frame.desc.crm     <- gframe("Description:", cont = crm, horizontal=T)
+lyt.desc.crm       <- glayout(cont = frame.desc.crm, expand = TRUE)
+lyt.desc.crm[1,1]  <- "The continuum removal technique was introduced by Clark and Roush (1984). \nThe algorithm find points lying on the convex hull of a spectrum, connects the points by linear interpolation and \nnormalizes the spectrum by dividing the input data by the interpolated line. Package: prospectr"
+lyt.desc.crm[2,1]  <- "Data type: Reflectance"
+lyt.desc.crm[3,1]  <- "Interpolation method: Linear"
+lyt.desc.crm[4,1]  <- "Normalization method: Division"
+                      gbutton("Run", cont = crm, handler = fcrm)
+                      gbutton("Plot spectra", cont = crm, handler = fplot)
+### SG Derivative
+frame.desc.sgd     <- gframe("Description:",cont = sgd, horizontal = T)
+lyt.desc.sgd       <- glayout(cont = frame.desc.sgd , expand = TRUE)
+lyt.desc.sgd[1,1]  <- "Savitzky-Golay smoothing and derivative.\nThe Savitzky-Golay algorithm fits a local polynomial regression on the signal. It requires evenly spaced data points. Mathematically, \nit operates simply as a weighted sum over a given window. Package: prospectr"
+frame.param.sgd    <- gframe("Parameters:", cont = sgd, horizontal=T)
+lyt.param.sgd      <- glayout(cont = frame.param.sgd, expand = TRUE)
+lyt.param.sgd[1,1] <- "Number of smoothing points"
+sgd.smooth         <- lyt.param.sgd[2,1] <- gspinbutton(from = 5, to = 101, by = 2, cont = lyt.param.sgd)
+lyt.param.sgd[1,2] <- "Polynomial order"
+sgd.poly           <- lyt.param.sgd[2,2] <- gcombobox(sgpolynomial, cont = lyt.param.sgd)
+lyt.param.sgd[1,3] <- "Derivative order"
+sgd.deriv          <- lyt.param.sgd[2,3] <- gcombobox(sgderivarive, cont = lyt.param.sgd)
+                      gbutton("Run", cont = sgd, handler = fsgd)
+                      gbutton("Plot spectra", cont = sgd, handler = fplot)
+### SNV
+frame.desc.snv     <- gframe("Description:", cont = snv, horizontal=T)
+lyt.desc.snv       <- glayout(cont = frame.desc.snv, expand = TRUE)
+lyt.desc.snv[1,1]  <- "Standard Normal Variate normalizes each row by substracting each row by its mean and dividing by \nits standard deviation. Package: prospectr"
+                      gbutton("Run", cont = snv, handler = fsnv)
+                      gbutton("Plot spectra", cont = snv, handler = fplot)
+
+### MSC
+frame.desc.msc     <- gframe("Description:", cont = msc, horizontal=T)
+lyt.desc.msc       <- glayout(cont = frame.desc.msc, expand = TRUE)
+lyt.desc.msc[1,1]  <- "Performs multiplicative scatter/signal correction on spectral data. Package: msc"
+                      gbutton("Run", cont = msc, handler = fmsc)
+                      gbutton("Plot spectra", cont = msc, handler = fplot)
+### Normalization
+frame.desc.nor     <- gframe("Description:",cont = nor, horizontal = T)
+lyt.desc.nor       <- glayout(cont = frame.desc.nor , expand = TRUE)
+lyt.desc.nor[1,1]  <- "Different types of data normalization. Package: clusterSim"
+frame.param.nor    <- gframe("Parameters:", cont = nor, horizontal=T)
+lyt.param.nor      <- glayout(cont = frame.param.nor, expand = TRUE)
+lyt.param.nor[1,1] <- "Type of Normalization."
+nor.type           <- lyt.param.nor[2,1] <- gradio(normalization.types,checked = T, cont = lyt.param.nor)
+                      gbutton("Run", cont = nor, handler = fnor)
+                      gbutton("Plot spectra", cont = nor, handler = fplot)
+
+###################################################
+### Split data
+###################################################
+splt                               <- ggroup(cont = notebook, label = gettext("       SPLIT DATA       "),horizontal = F)
+frame.split                        <- gframe("Split data:", cont = splt, horizontal=TRUE)
+lyt.file.split                     <- glayout(cont = frame.split, expand = T)
+lyt.file.split[1,1,anchor=c(1,0)]  <- "Validation set (%)"
+lyt.file.split[1,2,anchor=c(-1,0)] <- gedit(text = "30", cont = lyt.file.split, width = 2)
+                                      gbutton("Split data", cont = splt, handler = NULL)
+
+###################################################
+### Models
+###################################################
+mdl                <- gnotebook(cont = notebook, label = gettext("           MODEL           "),horizontal = F) 
+### MLR
+mdl.mlr            <- ggroup(cont = mdl, horizontal = F,label = gettext("   MLR   "))
+frame.desc.mlr     <- gframe("Description:",cont = mdl.mlr, horizontal = T)
+lyt.desc.mlr       <- glayout(cont = frame.desc.mlr, expand = TRUE)
+lyt.desc.mlr[1,1]  <- "Functions to perform Multiple Linear Regression (MLR). Package: stats / MASS / caret"
+frame.param.mlr    <- gframe("Tuning parameters:", cont = mdl.mlr, horizontal=T)
+lyt.param.mlr      <- glayout(cont = frame.param.mlr , expand = TRUE)
+lyt.param.mlr[1,1] <- "Band interval"
+lyt.param.mlr[2,1] <- gspinbutton(from = 1, to = 30, by = 1, value = 25, cont = lyt.param.mlr)
+                      gbutton("Run MLR model", cont = mdl.mlr)
+                      gbutton("Plot variable importance", cont = mdl.mlr)
+                      gbutton("MLR model results", cont = mdl.mlr)
+                      gbutton("Plot model accuracy",cont = mdl.mlr)
+### PLS
+mdl.pls            <- ggroup(cont = mdl, horizontal = F,label = gettext("   PLSR   "))
+frame.desc.pls     <- gframe("Description:",cont = mdl.pls, horizontal = T)
+lyt.desc.pls       <- glayout(cont = frame.desc.pls, expand = TRUE)
+lyt.desc.pls[1,1]  <- "Functions to perform partial least squares regression (PLSR). Package: pls / caret"
+frame.param.pls    <- gframe("Tuning parameters:", cont = mdl.pls, horizontal=T)
+lyt.param.pls      <- glayout(cont = frame.param.pls , expand = TRUE)
+lyt.param.pls[1,1] <- "Resampling method"
+lyt.param.pls[2,1] <- gcombobox(train.ctrl.method, cont = lyt.param.pls)
+lyt.param.pls[1,2] <- "Number of folds or number \nof resampling iterations"
+lyt.param.pls[2,2] <- gspinbutton(from = 1, to = 500, by = 1, cont = lyt.param.pls)
+lyt.param.pls[1,3] <- "For repeated k-fold cross-validation only: \nnumber of folds to compute"
+lyt.param.pls[2,3] <- gspinbutton(from = 1, to = 500, by = 1, cont = lyt.param.pls)
+lyt.param.pls[1,4] <- "Number of components to \ninclude in the model"
+lyt.param.pls[2,4] <- gspinbutton(from = 1, to = 500, by = 1, cont = lyt.param.pls)
+                      gbutton("Run PLSR model", cont = mdl.pls)
+                      gbutton("Plot variable importance", cont = mdl.pls)
+                      gbutton("PLSR model results", cont = mdl.pls)
+                      gbutton("Plot model accuracy",cont = mdl.pls)
+### SVM
+mdl.svm            <- ggroup(cont = mdl, horizontal = F,label = gettext("    SVM    "))
+frame.desc.svm     <- gframe("Description:",cont = mdl.svm, horizontal = T)
+lyt.desc.svm       <- glayout(cont = frame.desc.svm, expand = TRUE)
+lyt.desc.svm[1,1]  <- "Functions to perform Support Vector Machines (SVM). Package: e1071 / kernlab / caret"
+frame.param.svm    <- gframe("Tuning parameters:", cont = mdl.svm, horizontal=T)
+lyt.param.svm      <- glayout(cont = frame.param.svm , expand = TRUE)
+lyt.param.svm[1,1] <- "Resampling method"
+lyt.param.svm[2,1] <- gcombobox(train.ctrl.method, cont = lyt.param.svm)
+lyt.param.svm[1,2] <- "Kernel parameters"
+lyt.param.svm[2,2] <- gradio(kernel.param, cont = lyt.param.svm)
+                      gbutton("Run SVM model", cont = mdl.svm)
+                      gbutton("Plot variable importance", cont = mdl.svm)
+                      gbutton("SVM model results", cont = mdl.svm)
+                      gbutton("Plot model accuracy",cont = mdl.svm)
+### RF
+mdl.rf             <- ggroup(cont = mdl, horizontal = F,label = gettext("    RF    "))
+frame.desc.rf      <- gframe("Description:",cont = mdl.rf, horizontal = T)
+lyt.desc.rf        <- glayout(cont = frame.desc.rf, expand = TRUE)
+lyt.desc.rf[1,1]   <- "Functions to perform Random Forest (RF). Package: randomForest / caret"
+frame.param.rf     <- gframe("Tuning parameters:", cont = mdl.rf, horizontal=T)
+lyt.param.rf       <- glayout(cont = frame.param.rf , expand = TRUE)
+lyt.param.rf[1,1]  <- "Resampling method"
+lyt.param.rf[2,1]  <- gcombobox(train.ctrl.method.rf, cont = lyt.param.rf)
+lyt.param.rf[1,2]  <- "Randomly Selected Predictors \n(mtry)"
+lyt.param.rf[2,2]  <- gspinbutton(from = 50, to = 500, by = 50, value = 500, cont = lyt.param.rf)
+lyt.param.rf[1,3]  <- "Number of Trees \n(ntree)"
+lyt.param.rf[2,3]  <- gedit(text = "500", cont = lyt.param.rf, width = 4)
+                      gbutton("Run RF model", cont = mdl.rf)
+                      gbutton("Plot variable importance", cont = mdl.rf)
+                      gbutton("RF model results", cont = mdl.rf)
+                      gbutton("Plot model accuracy",cont = mdl.rf)
+### ANN
+mdl.ann            <- ggroup(cont = mdl, horizontal = F,label = gettext("    ANN    "))
+frame.desc.ann     <- gframe("Description:",cont = mdl.ann, horizontal = T)
+lyt.desc.ann       <- glayout(cont = frame.desc.ann, expand = TRUE)
+lyt.desc.ann[1,1]  <- "Functions to perform Artificial Neural Network (ANN). Package: elmNN / caret"
+frame.param.ann    <- gframe("Tuning parameters:", cont = mdl.ann, horizontal=T)
+lyt.param.ann      <- glayout(cont = frame.param.ann , expand = TRUE)
+lyt.param.ann[1,1] <- "Resampling method"
+lyt.param.ann[2,1] <- gcombobox(train.ctrl.method, cont = lyt.param.ann)
+lyt.param.ann[1,2] <- "Activation Function"
+lyt.param.ann[2,2] <- gcombobox(actf, cont = lyt.param.ann)
+lyt.param.ann[1,3] <- "Hidden Units"
+lyt.param.ann[2,3] <- gspinbutton(from = 1, to = 50, by = 1, value = 50, cont = lyt.param.ann)
+                      gbutton("Run ANN model", cont = mdl.ann)
+                      gbutton("Plot variable importance", cont = mdl.ann)
+                      gbutton("ANN model results", cont = mdl.ann)
+                      gbutton("Plot model accuracy",cont = mdl.ann)
+### BGLM
+mdl.bay            <- ggroup(cont = mdl, horizontal = F,label = gettext(" BGLM "))
+frame.desc.bay     <- gframe("Description:",cont = mdl.bay, horizontal = T)
+lyt.desc.bay       <- glayout(cont = frame.desc.bay, expand = TRUE)
+lyt.desc.bay[1,1]  <- "Functions to perform Bayesian Generalized Linear Model (BGLM). Package: arm / caret"
+frame.param.bay    <- gframe("Tuning parameters:", cont = mdl.bay, horizontal=T)
+lyt.param.bay      <- glayout(cont = frame.param.bay , expand = TRUE)
+lyt.param.bay[1,1] <- "Resampling method"
+lyt.param.bay[2,1] <- gcombobox(train.ctrl.method, cont = lyt.param.bay)
+lyt.param.bay[1,2] <- "Error distribution"
+lyt.param.bay[2,2] <- gcombobox(bayesian.family, cont = lyt.param.bay)
+                      gbutton("Run BGLM model", cont = mdl.bay)
+                      gbutton("Plot variable importance", cont = mdl.bay)
+                      gbutton("BGLM model results", cont = mdl.bay)
+                      gbutton("Plot model accuracy",cont = mdl.bay)
+
+### Focus on first tab
+svalue(notebook)   <- 1
+svalue(pp)         <- 1
+svalue(mdl)        <- 1
+### Window visibility
+visible(window)    <- TRUE
+##################################################################################################################
+```
