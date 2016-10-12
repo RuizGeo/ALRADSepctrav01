@@ -11,6 +11,10 @@ library(prospectr)
 ###################################################
 ### Auxiliar functions
 ###################################################
+## teste de modificacao
+
+
+
 fOK          <- function(h,...){do.call(h$action,list(svalue(h$obj)))}
 stub         <- function(h,...) gmessage("Called Handler", parent = window)
 fquit        <- function(...)   gconfirm("Are you sure?", icon="warning", parent=window, handler=dispose(window))
