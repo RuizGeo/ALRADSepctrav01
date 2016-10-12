@@ -8,10 +8,18 @@ library(prospectr)
 ```
 
 ``` {r ALRAD Spectra v.0.1}
+
+## ToDo
+# Message in Run button
+# Add Button for export 
+# combobox in Models
+# Exceptions
+# Progress bars
+# load packages
+
 ###################################################
 ### Auxiliar functions
 ###################################################
-#  escrever alguma coisa
 fOK          <- function(h,...){do.call(h$action,list(svalue(h$obj)))}
 stub         <- function(h,...) gmessage("Called Handler", parent = window)
 fquit        <- function(...)   gconfirm("Are you sure?", icon="warning", parent=window, handler=dispose(window))
