@@ -1,10 +1,13 @@
 
 ```{r Packages}
 install.packages(c("gWidgetsRGtk2", dep = TRUE))
+install.packages("prospectr")
+install.packages("msc")
+install.packages("clusterSim")
 library(gWidgetsRGtk2)
-library(hyperSpec)
-library(graphics)
 library(prospectr)
+library(msc)
+library(clusterSim)
 ```
 
 ``` {r ALRAD Spectra v.0.1}
@@ -63,7 +66,9 @@ fsgd         <- function(...) spectra <<- savitzkyGolay(spectra,
                                                         m = as.numeric(svalue(sgd.deriv)))
 fsnv         <- function(...) spectra <<- standardNormalVariate(X = spectra)
 fmsc         <- function(...) spectra <<- msc(spectra)
-fnor         <- function(...) spectra <<- data.Normalization(spectra, type="n5", normalization="row")
+fnor         <- function(...) spectra <<- data.Normalization(spectra,
+                                                             type = sub(":.*$","", svalue(nor.type)),
+                                                             normalization = "row")
 ###################################################
 ### Vectors
 ###################################################
