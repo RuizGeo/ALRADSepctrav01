@@ -12,13 +12,13 @@ library(clusterSim)
 
 ``` {r ALRAD Spectra v.0.1}
 
-## ToDo
-# Message in Run button
-# Add Button for export 
-# combobox in Models
-# Exceptions
-# Progress bars
-# load packages
+##         ToDo
+# Erro Message in button (andre)
+# Add Button for export (andre) 
+# combobox in Models (Diego)
+# Exceptions (Luis)
+# Progress bars (Luis)
+# Preprocessing ERROR need to be fixed: in MSC and Normalization (Diego)
 
 ###################################################
 ### Auxiliar functions
