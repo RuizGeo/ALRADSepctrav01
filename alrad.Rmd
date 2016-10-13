@@ -2,11 +2,11 @@
 ```{r Packages}
 install.packages(c("gWidgetsRGtk2", dep = TRUE))
 install.packages("prospectr")
-install.packages("msc")
+install.packages("pls")
 install.packages("clusterSim")
 library(gWidgetsRGtk2)
 library(prospectr)
-library(msc)
+library(pls)
 library(clusterSim)
 ```
 
