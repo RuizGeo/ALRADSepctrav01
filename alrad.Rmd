@@ -1,16 +1,17 @@
 
 ```{r Packages}
-install.packages(c("gWidgetsRGtk2", dep = TRUE))
-install.packages("prospectr")
-install.packages("pls")
-install.packages("clusterSim")
-library(gWidgetsRGtk2)
-library(prospectr)
-library(pls)
-library(clusterSim)
+install.packages(c("gWidgetsRGtk2","prospectr","pls","clusterSim","devtools", dep = TRUE))
+library(gWidgetsRGtk2) # GUI
+library(prospectr)     # preprocessing
+library(pls)           # msc 
+library(clusterSim)    # Normalization
+library(devtools)      # create package
+#ALRAD.Spectra()
+
 ```
 
 ``` {r ALRAD Spectra v.0.1}
+#ALRAD.Spectra <- function() { 
 
 ##         ToDo
 # Add well done Message in buttons (andre)
@@ -55,18 +56,32 @@ fplot        <- function(...) {plotwin <- gwindow("Plot", width = 1000, height =
                                     type = "l", 
                                     xlab = "Wavelength (nm)", 
                                     ylab = "Reflectance")}
+fsav.noi        <- function(...) {write.csv(t.noi, file=choose.files(caption="Save As...",
+                                                                  filters = c("Comma Delimited Files (.csv)","*.csv")))}
+fsav.det        <- function(...) {write.csv(t.det, file=choose.files(caption="Save As...",
+                                                                  filters = c("Comma Delimited Files (.csv)","*.csv")))}
+fsav.cr         <- function(...) {write.csv(t.cr, file=choose.files(caption="Save As...",
+                                                                  filters = c("Comma Delimited Files (.csv)","*.csv")))}
+fsav.sgd        <- function(...) {write.csv(t.sgd, file=choose.files(caption="Save As...",
+                                                                  filters = c("Comma Delimited Files (.csv)","*.csv")))}
+fsav.snv        <- function(...) {write.csv(t.snv, file=choose.files(caption="Save As...",
+                                                                  filters = c("Comma Delimited Files (.csv)","*.csv")))}
+fsav.msc        <- function(...) {write.csv(t.msc, file=choose.files(caption="Save As...",
+                                                                  filters = c("Comma Delimited Files (.csv)","*.csv")))}
+fsav.nor        <- function(...) {write.csv(t.nor, file=choose.files(caption="Save As...",
+                                                                  filters = c("Comma Delimited Files (.csv)","*.csv")))}
 ### Preprocessing functions
-fnrm         <- function(...) spectra <<- movav(spectra, w = as.numeric(svalue(number.smooth)))
-fdet         <- function(...) spectra <<- detrend(X = spectra, wav = as.numeric(colnames(spectra)))
-fcrm         <- function(...) spectra <<- continuumRemoval(X=spectra, type = "R", interpol="linear",
+fnrm         <- function(...) t.noi <<- movav(spectra, w = as.numeric(svalue(number.smooth)))
+fdet         <- function(...) t.det <<- detrend(X = spectra, wav = as.numeric(colnames(spectra)))
+fcrm         <- function(...) t.cr  <<- continuumRemoval(X=spectra, type = "R", interpol="linear",
                                                             method="division")
-fsgd         <- function(...) spectra <<- savitzkyGolay(spectra, 
+fsgd         <- function(...) t.sgd <<- savitzkyGolay(spectra, 
                                                         p = as.numeric(svalue(sgd.poly)),
                                                         w = as.numeric(svalue(sgd.smooth)),
                                                         m = as.numeric(svalue(sgd.deriv)))
-fsnv         <- function(...) spectra <<- standardNormalVariate(X = spectra)
-fmsc         <- function(...) spectra <<- msc(as.matrix(spectra))
-fnor         <- function(...) spectra <<- data.Normalization(spectra,
+fsnv         <- function(...) t.snv <<- standardNormalVariate(X = spectra)
+fmsc         <- function(...) t.msc <<- msc(as.matrix(spectra))
+fnor         <- function(...) t.nor <<- data.Normalization(spectra,
                                                              type = sub(":.*$","", svalue(nor.type)),
                                                              normalization = "row")
 ###################################################
@@ -156,13 +171,15 @@ lyt.param.nrm      <- glayout(cont = frame.param.nrm, expand = TRUE)
 lyt.param.nrm[1,1] <- "Number of smoothing points"
 number.smooth      <- lyt.param.nrm[2,1] <- gspinbutton(from = 5, to = 101, by = 2, cont = lyt.param.nrm)
                       gbutton("Run", cont = nrm, handler = fnrm)
-                      gbutton("Plot spectra", cont = nrm, handler = fplot)
+                      gbutton("Plot Spectra", cont = nrm, handler = fplot)
+                      gbutton("Save", cont = nrm, handler = fsav.noi)
 ### Detrend
 frame.desc.det     <- gframe("Description:", cont = det, horizontal=T)
 lyt.desc.det       <- glayout(cont = frame.desc.det, expand = TRUE)
 lyt.desc.det[1,1]  <- "Normalizes each row by applying a Standard Normal Variate transformation followed by fitting \na second order linear model and returning the fitted residuals. Package: prospectr"
                       gbutton("Run", cont = det, handler = fdet)
-                      gbutton("Plot spectra", cont = det, handler = fplot)
+                      gbutton("Plot Spectra", cont = det, handler = fplot)
+                      gbutton("Save", cont = det, handler = fsav.det)
 ### Continuum Removal
 frame.desc.crm     <- gframe("Description:", cont = crm, horizontal=T)
 lyt.desc.crm       <- glayout(cont = frame.desc.crm, expand = TRUE)
@@ -171,7 +188,8 @@ lyt.desc.crm[2,1]  <- "Data type: Reflectance"
 lyt.desc.crm[3,1]  <- "Interpolation method: Linear"
 lyt.desc.crm[4,1]  <- "Normalization method: Division"
                       gbutton("Run", cont = crm, handler = fcrm)
-                      gbutton("Plot spectra", cont = crm, handler = fplot)
+                      gbutton("Plot Spectra", cont = crm, handler = fplot)
+                      gbutton("Save", cont = crm, handler = fsav.cr)
 ### SG Derivative
 frame.desc.sgd     <- gframe("Description:",cont = sgd, horizontal = T)
 lyt.desc.sgd       <- glayout(cont = frame.desc.sgd , expand = TRUE)
@@ -185,20 +203,22 @@ sgd.poly           <- lyt.param.sgd[2,2] <- gcombobox(sgpolynomial, cont = lyt.p
 lyt.param.sgd[1,3] <- "Derivative order"
 sgd.deriv          <- lyt.param.sgd[2,3] <- gcombobox(sgderivarive, cont = lyt.param.sgd)
                       gbutton("Run", cont = sgd, handler = fsgd)
-                      gbutton("Plot spectra", cont = sgd, handler = fplot)
+                      gbutton("Plot Spectra", cont = sgd, handler = fplot)
+                      gbutton("Save", cont = sgd, handler = fsav.sgd)
 ### SNV
 frame.desc.snv     <- gframe("Description:", cont = snv, horizontal=T)
 lyt.desc.snv       <- glayout(cont = frame.desc.snv, expand = TRUE)
 lyt.desc.snv[1,1]  <- "Standard Normal Variate normalizes each row by substracting each row by its mean and dividing by \nits standard deviation. Package: prospectr"
                       gbutton("Run", cont = snv, handler = fsnv)
-                      gbutton("Plot spectra", cont = snv, handler = fplot)
-
+                      gbutton("Plot Spectra", cont = snv, handler = fplot)
+                      gbutton("Save", cont = snv, handler = fsav.snv)
 ### MSC
 frame.desc.msc     <- gframe("Description:", cont = msc, horizontal=T)
 lyt.desc.msc       <- glayout(cont = frame.desc.msc, expand = TRUE)
 lyt.desc.msc[1,1]  <- "Performs multiplicative scatter/signal correction on spectral data. Package: msc"
                       gbutton("Run", cont = msc, handler = fmsc)
-                      gbutton("Plot spectra", cont = msc, handler = fplot)
+                      gbutton("Plot Spectra", cont = msc, handler = fplot)
+                      gbutton("Save", cont = msc, handler = fsav.msc)
 ### Normalization
 frame.desc.nor     <- gframe("Description:",cont = nor, horizontal = T)
 lyt.desc.nor       <- glayout(cont = frame.desc.nor , expand = TRUE)
@@ -208,7 +228,8 @@ lyt.param.nor      <- glayout(cont = frame.param.nor, expand = TRUE)
 lyt.param.nor[1,1] <- "Type of Normalization."
 nor.type           <- lyt.param.nor[2,1] <- gradio(normalization.types,checked = T, cont = lyt.param.nor)
                       gbutton("Run", cont = nor, handler = fnor)
-                      gbutton("Plot spectra", cont = nor, handler = fplot)
+                      gbutton("Plot Spectra", cont = nor, handler = fplot)
+                      gbutton("Save", cont = nor, handler = fsav.nor)
 
 ###################################################
 ### Split data
@@ -327,5 +348,48 @@ svalue(pp)         <- 1
 svalue(mdl)        <- 1
 ### Window visibility
 visible(window)    <- TRUE
+  
+# }
 ##################################################################################################################
 ```
+
+```{r Exceptions}
+#accessory functions to odd number
+is.odd <- function(x) x %% 2 != 0
+
+#spectra.start.column
+if (is.numeric(spectra.start.column) == T & spectra.start.column > 0) {print('Number correct')}  else {print ('Error: Column number must be greater than 0')}
+#spectra.finish.column
+if (is.numeric(spectra.finish.column) == T &  spectra.finish.column > 0) {print('Number correct')}  else {print ('Error: Column number must be greater than 0')}
+
+#spectra.start.number
+if (is.numeric(spectra.start.number) == T & spectra.start.number > 0) {print('Number correct')}  else {print ('Error: Column number must be greater than 0')}
+#spectra.finish.number
+if (is.numeric(spectra.finish.number) == T &  spectra.finish.number > 0) {print('Number correct')}  else {print ('Error: Column number must be greater than 0')}
+
+#var.column
+if (is.numeric(var.column) == T &  var.column > 0) {print('Number correct')}  else {print ('Error: Column number must be greater than 0')}
+#obs.start
+if (is.numeric(obs.start) == T &  obs.start > 0) {print('Number correct')}  else {print ('Error: Column number must be greater than 0')}
+#obs.finish
+if (is.numeric(obs.finish) == T &  obs.finish > 0) {print('Number correct')}  else {print ('Error: Column number must be greater than 0')}
+
+#assess waveleght
+if (is.numeric(number.wave) == T & is.odd(number.wave) & any(number.wave==c(2:50))) {print('Number correct')}  else {print ('Error:  waveleght must be odd and the number or is not between 3 to 49')}
+#assess polynomial
+if (is.numeric(poly.order) == T & any(poly.order==c(1:4))  ){print('Number correct')} else {print ('Error: Polynomial number in not between 1 to 3')}
+#assess derivative
+if (is.numeric(number.deriv) == T & any(number.deriv==c(0:4))  ){print('Number correct')} else {print ('Error: Number for derivative. 0 is for smoothing')}
+#
+if (identical(poly.order,number.deriv) == T) {print("Same number")} else {print("Error: Polynomial order and Derivative number should be the same")}
+
+#assess Header
+if (read.header == T | read.header == F ){print('Header is correct')} else {print ('Error variable header file')}
+
+#assess file extension
+extension.file <-file_ext(path.file)
+if (extension.file == 'csv'| extension.file == 'txt'| extension.file == 'xlsx'){
+  spectra <- read.table(path.file,h=read.header,sep=sep.col) 
+print('Read spectra correct')} else {print ('Error extension file')}
+```
+
