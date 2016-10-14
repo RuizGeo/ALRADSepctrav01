@@ -13,12 +13,12 @@ library(clusterSim)
 ``` {r ALRAD Spectra v.0.1}
 
 ##         ToDo
-# Erro Message in button (andre)
+# Add well done Message in buttons (andre)
 # Add Button for export (andre) 
 # combobox in Models (Diego)
 # Exceptions (Luis)
 # Progress bars (Luis)
-# Preprocessing ERROR need to be fixed: in MSC and Normalization (Diego)
+# Preprocessing ERROR need to be fixed: in Normalization (Diego)
 
 ###################################################
 ### Auxiliar functions
@@ -49,7 +49,7 @@ fonlyspectra <- function(...) {spc <- alldata[,spectra.start.column:spectra.end.
                                colnames(spc) <- c(spectra.start.number:spectra.end.number)
                                spectra <<- spc}
 fview        <- function(...) gtable(alldata, cont = gwindow("View data", width = 800, height = 200))
-fplot        <- function(...) {plotwin <- gwindow("Plot", width = 800, height = 600)
+fplot        <- function(...) {plotwin <- gwindow("Plot", width = 1000, height = 800)
                                  ggraphics(cont = plotwin)
                                  matplot(colnames(spectra), t(spectra), 
                                     type = "l", 
@@ -65,7 +65,7 @@ fsgd         <- function(...) spectra <<- savitzkyGolay(spectra,
                                                         w = as.numeric(svalue(sgd.smooth)),
                                                         m = as.numeric(svalue(sgd.deriv)))
 fsnv         <- function(...) spectra <<- standardNormalVariate(X = spectra)
-fmsc         <- function(...) spectra <<- msc(spectra)
+fmsc         <- function(...) spectra <<- msc(as.matrix(spectra))
 fnor         <- function(...) spectra <<- data.Normalization(spectra,
                                                              type = sub(":.*$","", svalue(nor.type)),
                                                              normalization = "row")
